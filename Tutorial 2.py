@@ -9,9 +9,6 @@
 # Query Selectors
 # https://docs.mongodb.com/manual/reference/operator/query/#query-selectors
 
-# Code Download
-# https://techwithtim.net/wp-content/uploads/2020/09/MongoDB-Tutorial.zip
-
 # FIRST TUTORIAL
 
 import pymongo
