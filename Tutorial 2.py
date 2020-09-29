@@ -1,16 +1,3 @@
-# Async https://motor.readthedocs.io/en/stable/
-# MongoDB Compass: https://www.mongodb.com/try/download/compass
-
-# Embedding documents
-# want to perform fewest read operations possible
-# https://docs.mongodb.com/manual/tutorial/model-embedded-one-to-one-relationships-between-documents/
-# Can add a database refrence
-
-# Query Selectors
-# https://docs.mongodb.com/manual/reference/operator/query/#query-selectors
-
-# FIRST TUTORIAL
-
 import pymongo
 import datetime
 import csv
@@ -55,9 +42,6 @@ def add_purchase(car_id, customer_id, method):
     }
     return purchases.insert_one(document)
 
-# END FIRST TUTORIAL
-
-# Use this to add lots of data so we can have some intersting queries
 def add_car_data(filename):
     with open(filename, 'r') as file:
         columns = file.readline().split(',')
@@ -82,95 +66,88 @@ def add_car_data(filename):
         
         cars.insert_many(documents)
 
-#cars.delete_many({})
-#add_car_data('data.csv')
 
 # QUERIES
 
 # All cars with price less than 30,000
-result = cars.find({'MSRP': {'$lte': 30000}}).limit(5)
-#printer.pprint(list(result))
 
-# The count of each car brand in inventory
-result = cars.aggregate([
-    {'$addFields': {
-        'cheap': {'$cond': [{'$lte': ['$MSRP', 30000]}, True, False]}
-        }
-    }
-])
-#printer.pprint(list(result))
+result = cars.find({'MSRP': {'$lte': 30000}})
+
+result = cars.count_documents({'Make': {'$eq': 'Ford'}})
 
 # How many cars are older than 2000
-result = cars.count_documents({'Year': {'$lte': 2000}})
-#print(result)
+result = cars.count_documents({'Year': {'$lt': 2000}})
 
 # Average price of all car brands
 result = cars.aggregate([
-    {
-        '$group':
-        {
-            '_id': '$Make',
-            'count': {'$sum': 1},
-            'average price': {'$avg': '$MSRP'},
-            'models': {'$addToSet': '$Model'}
+    {'$group': {
+        '_id': '$Make',
+        'count': {'$sum': 1},
+        'average price': {'$avg': '$MSRP'}
         }
-    }
+    }    
 ])
-printer.pprint(list(result))
-
+#printer.pprint(list(result))
+    
 # Car with max price
 result = cars.aggregate([
     {
-        '$group':
-        {
+        '$group': {
             '_id': None,
-            'max_price': {'$max': '$MSRP'},
+            'max price': {'$max': '$MSRP'}
         }
     }
 ])
-#printer.pprint(list(result))
 
 result = cars.find({}).sort([('MSRP', -1)]).limit(1)
 #printer.pprint(list(result))
 
-# CUSTOMER CARS PURCHASED
+# Average price of hondas newer than 2000 by model
+result = cars.aggregate([
+    {
+        '$match': {
+            'Make': {'$eq': 'Honda'},
+            'Year': {'$gt': 2000}
+        }
+    },
+    {
+        '$group': {
+            '_id': '$Model',
+            'average price': {'$avg': '$MSRP'}
+        }
+    }
+])
+
 def get_customer_info():
-    print('Please enter the details for the customer... ')
+    print('type in your info')
     first_name = input('First Name: ')
     last_name = input('Last Name: ')
     return first_name, last_name
 
 
-while True:
-    first, last = get_customer_info()
-    customer_and_purchases = list(customers.aggregate([
-        {'$match': 
-            {'First Name': first, 'Last Name': last}
-        }, 
-        {'$lookup': {
+first, last = get_customer_info()
+customer_and_purchases = list(customers.aggregate([
+    {
+        '$match': {'First Name': first, 'Last Name': last}
+    },
+    {
+        '$lookup': {
             'from': 'purchases',
             'localField': '_id',
             'foreignField': 'Customer ID',
-            'as': 'purchases'
-            }
-        }]))
+            'as': 'Purchases'
+        }
+    }
+]))
 
-    if len(customer_and_purchases) < 0:
-        print('No results')
-        continue
+for i, customer in enumerate(customer_and_purchases):
+    print(f"{i+1}. {customer['First Name']} {customer['Last Name']}, {customer['Date of Birth']}")
 
-    for i, customer in enumerate(customer_and_purchases):
-        print(f'{i+1}. {customer["First Name"]} {customer["Last Name"]}, {customer["Date of Birth"]}')
+selection = input('Select a number for the customer: ')
+customer = customer_and_purchases[int(selection) - 1]
 
-    while True:
-        selection = input('Type the number of the customer you\' like to access: ')
-        if selection.isdigit() and int(selection) in range(1,len(customer_and_purchases)+1):
-            customer = customer_and_purchases[int(selection) - 1]
-            break
-        print('Invalid, try again...')
-
-    print(f'Customer has purchased {len(customer["purchases"])} cars')
-    for i, entry in enumerate(customer_and_purchases):
-        print(f'{i+1}. {entry["purchases"]}')
-
-
+print(f'Customer has purchased {len(customer["Purchases"])} cars')
+for i, entry in enumerate(customer['Purchases']):
+    car_id = entry['Car ID']
+    car = cars.find_one({'_id': car_id})
+    print(f'{i + 1}. {car}')
